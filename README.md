@@ -1,58 +1,73 @@
-<h1 align="center">Hi 👋, I'm Furkan Onat</h1>
+<div align="center">
 
-<h3 align="center">
-Full Stack Developer | AI & Machine Learning | Mobile & Game Development
-</h3>
+# Furkan Onat
 
-<p align="center">
-I build modern full-stack applications, AI-powered tools,
-mobile apps and interactive game experiences.
-</p>
+### Full Stack Developer
 
----
+**Web Development • AI/ML • Mobile • Game Development**
 
-## 👨‍💻 About Me
+<br/>
 
-- 💻 Full Stack Developer
-- 🤖 Interested in AI & Machine Learning
-- 📱 Building cross-platform applications with Flutter
-- 🎮 Developing games and systems with Unity & C#
-- 🛠️ Interested in backend systems and developer tools
-- 🚀 Always learning and building new projects
+<img src="https://skillicons.dev/icons?i=html,css,js,python,cs,dart,flutter,unity,git,github&theme=dark" />
 
-## 🛠️ Tech Stack
-
-### Languages
-
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![C%23](https://img.shields.io/badge/C%23-512BD4?style=for-the-badge&logo=csharp&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-323330?style=for-the-badge&logo=javascript&logoColor=F7DF1E)
-![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
-
-### Frameworks & Tools
-
-![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Unity](https://img.shields.io/badge/Unity-000000?style=for-the-badge&logo=unity&logoColor=white)
-![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
-![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)
+</div>
 
 ---
 
-## 🚀 Featured Projects
+## <div align="center">GitHub Stats</div>
 
-### 🧠 Brain Tumor Detection
-Deep learning project for detecting brain tumors from MRI images.
+<div align="center">
 
-### 🛠️ Smart Error Tracker
-An intelligent error tracking system that collects, groups and analyzes frontend/backend errors using AI.
+<img height="170" src="https://github-readme-stats.vercel.app/api?username=FurkanOnatt&show_icons=true&include_all_commits=true&count_private=true&theme=github_dark&hide_border=true" />
 
-### 🤖 AI Log Explainer
-AI-powered tool for analyzing and explaining application logs.
+</div>
 
 ---
 
-## 📫 Contact
+## <div align="center">Most Used Languages</div>
 
-📍 Ankara, Türkiye
+<div align="center">
 
-📧 **furkanonat@hotmail.com**
+<img height="190" src="https://github-readme-stats.vercel.app/api/top-langs/?username=FurkanOnatt&layout=compact&langs_count=8&theme=github_dark&hide_border=true" />
+
+</div>
+
+---
+
+## <div align="center">🔥 Commit Streak</div>
+
+<div align="center">
+
+<img src="https://streak-stats.demolab.com?user=FurkanOnatt&theme=github-dark-blue&hide_border=true" />
+
+</div>
+
+---
+
+## <div align="center">📈 Contribution Activity</div>
+
+<div align="center">
+
+View my contribution activity below ↓
+
+</div>
+
+---
+
+## <div align="center">Contact</div>
+
+<div align="center">
+
+<a href="mailto:furkanonat@hotmail.com">
+<img src="https://img.shields.io/badge/Email_Me-6C63FF?style=for-the-badge&logo=microsoftoutlook&logoColor=white" />
+</a>
+&nbsp;
+<a href="https://github.com/FurkanOnatt">
+<img src="https://img.shields.io/badge/GitHub-FurkanOnatt-181717?style=for-the-badge&logo=github&logoColor=white" />
+</a>
+
+<br/><br/>
+
+<sub>Full Stack • Web • AI/ML • Mobile • Game Development</sub>
+
+</div>
