@@ -70,6 +70,6 @@
 
 <br/><br/>
 
-<sub>Full Stac • Web • AI/ML • Mobile • Game Development</sub>
+<sub>Full Stack • Web • AI/ML • Mobile • Game Development</sub>
 
 </div>
