@@ -2,7 +2,7 @@
 
 # Furkan Onat
 
-### Full Stack Developer
+###Junior Full Stack Developer
 
 **Web Development • AI/ML • Mobile • Game Development**
 
