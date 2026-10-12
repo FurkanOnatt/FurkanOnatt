@@ -23,9 +23,9 @@ for pos in path:
 # Generate animated SVG using CSS discrete keyframes, with 1 rectangle per snake segment.
 # Each segment follows prior head locations. Positions are held between frames.
 # Compress to <= 220 frames to keep SVG reasonably sized, while preserving growth at sampled steps.
-indices=list(range(0,len(frames),max(1,math.ceil(len(frames)/180))))
+indices=list(range(0,len(frames),1))
 if indices[-1]!=len(frames)-1: indices.append(len(frames)-1)
-N=len(indices); duration=22
+N=len(indices); duration=65
 W=left*2+(cols-1)*pitch+cell; H=top*2+(rows-1)*pitch+cell
 out=[f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="Animated contribution snake for {html.escape(USER)}">', '<style>']
 # Use one CSS animation per segment, each with changing x/y coordinates using transforms.
@@ -39,15 +39,24 @@ for s in range(max_segments):
         else: transform='translate(-30px,-30px)'; opacity='0'
         stops.append(f'{j/(N-1)*100:.3f}%{{transform:{transform};opacity:{opacity}}}')
     out.append(f'@keyframes seg{s}{{'+''.join(stops)+'}')
+# Contribution tiles stay hidden after consumption until the entire animation restarts.
+# Keyframe at the moment the head reaches a tile, then remain invisible.
+for x in range(cols):
+    for y in range(rows):
+        if values.get((x,y),0)<=0: continue
+        idx=path.index((x,y))
+        pct=(idx+0.5)/N*100
+        out.append(f'@keyframes eat_{x}_{y}{{0%,{pct:.4f}%{{opacity:1}}{min(100,pct+0.001):.4f}%,100%{{opacity:0}}}}')
 out.append('</style>')
 for x in range(cols):
     for y in range(rows):
         count=values.get((x,y),0)
         fill=('#161b22' if count==0 else '#312e81' if count==1 else '#4338ca' if count<4 else '#7c3aed' if count<8 else '#a855f7')
-        out.append(f'<rect x="{left+x*pitch}" y="{top+y*pitch}" width="{cell}" height="{cell}" rx="3" fill="{fill}"/>')
+        style=f' style="animation:eat_{x}_{y} {duration}s steps(1,end) infinite"' if count>0 else ''
+        out.append(f'<rect x="{left+x*pitch}" y="{top+y*pitch}" width="{cell}" height="{cell}" rx="3" fill="{fill}"{style}/>')
 for s in range(max_segments-1,-1,-1):
     color='#22d3ee' if s==0 else '#8b5cf6'
-    out.append(f'<rect width="{cell}" height="{cell}" rx="4" fill="{color}" style="animation:seg{s} {duration}s steps(1,end) infinite"/>')
+    out.append(f'<rect width="{cell}" height="{cell}" rx="4" fill="{color}" style="animation:seg{s} {duration}s linear infinite"/>')
 out.append('</svg>')
 os.makedirs('dist',exist_ok=True)
 with open('dist/custom-snake.svg','w',encoding='utf-8') as f:f.write('\n'.join(out))
