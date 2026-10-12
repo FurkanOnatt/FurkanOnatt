@@ -1,331 +1,183 @@
-
-import os
-import json
-import html
-import random
-import datetime
-import urllib.request
+import os, json, random, datetime, urllib.request, html
 from pathlib import Path
 
-USER = os.getenv("GITHUB_USER", "FurkanOnatt")
-TOKEN = os.getenv("GITHUB_TOKEN", "")
-
+USER = os.getenv('GITHUB_USER', 'FurkanOnatt')
+TOKEN = os.getenv('GITHUB_TOKEN', '')
 if not TOKEN:
-    raise RuntimeError("GITHUB_TOKEN is required")
+    raise RuntimeError('GITHUB_TOKEN is required. Set it in the GitHub Actions workflow.')
 
-# Animation settings
-CELL = 12
-PITCH = 17
-MARGIN = 18
+CELL, PITCH, MARGIN = 12, 17, 18
 START_LENGTH = 3
-ROUTE_VARIATIONS = 3
-SECONDS_PER_MOVE = 0.075
+SECONDS_PER_MOVE = 0.20  # Increase to 0.25 for slower motion
+ROUTE_VARIATIONS = 2
 
-# Get GitHub contribution data
-query = """
-query($login: String!) {
-  user(login: $login) {
-    contributionsCollection {
-      contributionCalendar {
-        weeks {
-          contributionDays {
-            date
-            contributionCount
-          }
-        }
-      }
-    }
-  }
-}
-"""
+query = '''query($login:String!){user(login:$login){contributionsCollection{contributionCalendar{weeks{contributionDays{date contributionCount}}}}}}'''
+req = urllib.request.Request('https://api.github.com/graphql', data=json.dumps({'query':query,'variables':{'login':USER}}).encode(), headers={'Authorization':f'Bearer {TOKEN}','Content-Type':'application/json','User-Agent':'readme-custom-snake'})
+with urllib.request.urlopen(req, timeout=30) as response:
+    result=json.load(response)
+if result.get('errors') or not result.get('data',{}).get('user'):
+    raise RuntimeError(f'GitHub API error: {result.get("errors", result)}')
+weeks=result['data']['user']['contributionsCollection']['contributionCalendar']['weeks']
+COLS=len(weeks)
+ROWS=7
+values={}
+for x,week in enumerate(weeks):
+    for day in week['contributionDays']:
+        y=(datetime.date.fromisoformat(day['date']).weekday()+1)%7
+        values[(x,y)]=day['contributionCount']
+foods={pos for pos,count in values.items() if count>0}
 
-request = urllib.request.Request(
-    "https://api.github.com/graphql",
-    data=json.dumps({
-        "query": query,
-        "variables": {"login": USER}
-    }).encode(),
-    headers={
-        "Authorization": f"Bearer {TOKEN}",
-        "Content-Type": "application/json",
-        "User-Agent": "custom-growing-snake"
-    }
-)
+# The snake always starts at the upper-left EMPTY margin, not on a contribution.
+START=(-1,0)
+rng=random.Random()
 
-with urllib.request.urlopen(request, timeout=30) as response:
-    result = json.load(response)
+from collections import deque
 
-if result.get("errors"):
-    raise RuntimeError(str(result["errors"]))
+# Head starts at (-1, 0); the two initial tail cells are outside the grid.
+# A move into the current tail is safe only when the tail moves away.
+def legal_next(body, nxt, remaining):
+    x, y = nxt
+    if not (-1 <= x < COLS and 0 <= y < ROWS):
+        return False
+    growing = nxt in remaining
+    blocked = body if growing else body[:-1]
+    return nxt not in blocked
 
-weeks = result["data"]["user"]["contributionsCollection"][
-    "contributionCalendar"
-]["weeks"]
-
-COLS = len(weeks)
-ROWS = 7
-
-values = {}
-
-for x, week in enumerate(weeks):
-    for day in week["contributionDays"]:
-        date = datetime.date.fromisoformat(day["date"])
-        y = (date.weekday() + 1) % 7
-        values[(x, y)] = day["contributionCount"]
-
-foods = {pos for pos, count in values.items() if count > 0}
-
-rng = random.Random()
-
-def direct_route(start, target):
-    """Move toward the target without sweeping the whole grid."""
-    x, y = start
-    tx, ty = target
-    route = []
-
-    # Randomly choose horizontal-first or vertical-first.
-    axes = ["x", "y"]
-    rng.shuffle(axes)
-
-    for axis in axes:
-        if axis == "x":
-            while x != tx:
-                x += 1 if tx > x else -1
-                route.append((x, y))
-        else:
-            while y != ty:
-                y += 1 if ty > y else -1
-                route.append((x, y))
-
-    return route
-
-def create_cycle():
-    if not foods:
-        return [(0, 0)], {}, (0, 0)
-
-    # Start from a random occupied contribution square.
-    start = rng.choice(tuple(sorted(foods)))
-    remaining = set(foods)
-    remaining.remove(start)
-
-    path = [start]
-    eaten = {start: 0}
-
-    while remaining:
-        current = path[-1]
-
-        # Choose randomly among nearby remaining targets.
-        ranked = sorted(
-            remaining,
-            key=lambda p: (
-                abs(p[0] - current[0]) +
-                abs(p[1] - current[1])
-            )
-        )
-
-        candidates = ranked[:min(6, len(ranked))]
-        target = rng.choice(candidates)
-
-        route = direct_route(current, target)
-
-        for position in route:
-            path.append(position)
-
-            # Any food crossed is eaten immediately.
-            if position in remaining:
-                remaining.remove(position)
-                eaten[position] = len(path) - 1
-
-    return path, eaten, start
-
-def fmt(value):
-    return f"{value:.5f}".rstrip("0").rstrip(".")
-
-# Generate several different animation cycles.
-cycles = [create_cycle() for _ in range(ROUTE_VARIATIONS)]
-
-total_moves = sum(max(1, len(c[0]) - 1) for c in cycles)
-duration = max(12, total_moves * SECONDS_PER_MOVE)
-
-width = MARGIN * 2 + (COLS - 1) * PITCH + CELL
-height = MARGIN * 2 + (ROWS - 1) * PITCH + CELL
-
-output = [
-    f'<svg xmlns="http://www.w3.org/2000/svg" '
-    f'width="{width}" height="{height}" '
-    f'viewBox="0 0 {width} {height}" '
-    f'role="img" aria-label="Growing snake for '
-    f'{html.escape(USER, quote=True)}">',
-    "<style>"
-]
-
-# Timeline positions for all cycles.
-timeline = []
-food_events = {}
-offset = 0
-
-for cycle_index, (path, eaten, start) in enumerate(cycles):
-    for step, position in enumerate(path):
-        timeline.append((cycle_index, step, position))
-
-    food_events[cycle_index] = eaten
-    offset += len(path)
-
-total_frames = len(timeline)
-denominator = max(1, total_frames)
-
-# Build growing snake bodies.
-bodies = []
-current_body = []
-current_cycle = -1
-consumed = set()
-
-for cycle_index, step, position in timeline:
-    if cycle_index != current_cycle:
-        current_cycle = cycle_index
-        consumed = set()
-        current_body = [position] * START_LENGTH
-
-    else:
-        current_body.insert(0, position)
-
-        if position in foods and position not in consumed:
-            consumed.add(position)
-        else:
-            current_body.pop()
-
-    if step == 0 and position in foods:
-        consumed.add(position)
-
-    bodies.append(list(current_body))
-
-max_segments = max(len(body) for body in bodies)
-
-# Animate each segment smoothly.
-for segment in range(max_segments):
-    keyframes = []
-
-    for i, body in enumerate(bodies):
-        pct = 100 * i / denominator
-
-        if segment < len(body):
-            x, y = body[segment]
-            opacity = 1
-        else:
-            x, y = -3, -3
-            opacity = 0
-
-        keyframes.append(
-            f'{fmt(pct)}%{{'
-            f'transform:translate('
-            f'{MARGIN + x * PITCH}px,'
-            f'{MARGIN + y * PITCH}px);'
-            f'opacity:{opacity}}}'
-        )
-
-    # Hold the final frame until the loop restarts.
-    keyframes.append(
-        f'100%{{'
-        f'transform:translate('
-        f'{MARGIN + bodies[-1][min(segment, len(bodies[-1])-1)][0] * PITCH}px,'
-        f'{MARGIN + bodies[-1][min(segment, len(bodies[-1])-1)][1] * PITCH}px);'
-        f'opacity:{int(segment < len(bodies[-1]))}}}'
-    )
-
-    output.append(
-        f'@keyframes snake_{segment}{{'
-        + "".join(keyframes)
-        + "}"
-    )
-
-# Food visibility: disappear when eaten, reset only
-# at the beginning of the next complete cycle.
-for pos in sorted(foods):
+def neighbors(pos):
     x, y = pos
-    keyframes = []
+    opts = [(x+1,y),(x-1,y),(x,y+1),(x,y-1)]
+    rng.shuffle(opts)
+    return opts
 
-    offset = 0
-    for cycle_index, (path, eaten, start) in enumerate(cycles):
-        start_pct = 100 * offset / denominator
-        eat_step = eaten.get(pos)
-        eat_pct = 100 * (offset + eat_step) / denominator
+def safe_route(body, target, remaining):
+    # Search with a simulated moving body, not just a static obstacle map.
+    start = tuple(body)
+    queue = deque([(start, [])])
+    seen = {start}
+    limit = 35000
+    while queue and len(seen) < limit:
+        state, path = queue.popleft()
+        for nxt in neighbors(state[0]):
+            if not legal_next(state, nxt, remaining):
+                continue
+            grows = nxt in remaining
+            updated = (nxt,) + (state if grows else state[:-1])
+            if nxt == target:
+                return path + [nxt]
+            if updated not in seen:
+                seen.add(updated)
+                queue.append((updated, path + [nxt]))
+    return None
 
-        keyframes.append(
-            f'{fmt(start_pct)}%{{opacity:1}}'
-        )
-        keyframes.append(
-            f'{fmt(max(start_pct, eat_pct - 0.00001))}%'
-            '{opacity:1}'
-        )
-        keyframes.append(
-            f'{fmt(eat_pct)}%{{opacity:0}}'
-        )
+def make_cycle():
+    remaining = set(foods)
+    body = [START, (-2,0), (-3,0)]
+    positions = [START]
+    bodies = [body.copy()]
+    eaten = {}
+    while remaining:
+        # Try nearby random targets, then farther targets if needed.
+        ordered = sorted(remaining, key=lambda p: abs(p[0]-body[0][0])+abs(p[1]-body[0][1]))
+        choices = ordered[:min(8,len(ordered))]
+        rng.shuffle(choices)
+        route = None
+        for target in choices:
+            route = safe_route(body,target,remaining)
+            if route:
+                break
+        if not route:
+            for target in ordered[8:]:
+                route = safe_route(body,target,remaining)
+                if route:
+                    break
+        if not route:
+            print(f'No collision-free route; {len(remaining)} squares remain. Ending cycle safely.')
+            break
+        blocked_route = False
+        for nxt in route:
+            if not legal_next(body, nxt, remaining):
+                blocked_route = True
+                break
+            grows = nxt in remaining
+            body.insert(0,nxt)
+            if grows:
+                remaining.remove(nxt)
+                eaten[nxt] = len(positions)
+            else:
+                body.pop()
+            positions.append(nxt)
+            bodies.append(body.copy())
+        if blocked_route:
+            continue  # Replan using the updated body and remaining food.
+    for _ in range(6):
+        positions.append(positions[-1])
+        bodies.append(body.copy())
+    return positions, eaten, bodies
 
-        offset += len(path)
+cycles=[make_cycle() for _ in range(ROUTE_VARIATIONS)]
+frames=[]
+states=[]
+for ci,(path,eaten,bodies) in enumerate(cycles):
+    for step,pos in enumerate(path):
+        frames.append((ci,step,pos))
+        states.append(bodies[step])
+N=len(frames)
+duration=max(1,(N-1)*SECONDS_PER_MOVE)
+width=MARGIN*2+(COLS-1)*PITCH+CELL
+height=MARGIN*2+(ROWS-1)*PITCH+CELL
 
-    keyframes.append("100%{opacity:0}")
+def fmt(x):
+    return f'{x:.6f}'.rstrip('0').rstrip('.')
 
-    output.append(
-        f'@keyframes food_{x}_{y}{{'
-        + "".join(keyframes)
-        + "}"
-    )
+def pct(i):
+    return fmt(100*i/max(1,N-1))
 
-output.append("</style>")
+def translate(pos):
+    x,y=pos
+    return f'translate({MARGIN+x*PITCH}px,{MARGIN+y*PITCH}px)'
 
-# Draw contribution grid.
+max_segments=max(map(len,states))
+
+parts=[f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="Growing contribution snake for {html.escape(USER,quote=True)}">','<style>']
+# The food layer is only restored when the entire board has been eaten.
+# SVG keyframes use discrete opacity changes and smooth position transitions.
+for pos in sorted(foods):
+    x,y=pos
+    changes=[]
+    start=0
+    for path,eaten,_bodies in cycles:
+        changes.append((start,1))
+        eat_index=start+eaten.get(pos, len(path)-1)
+        changes.append((eat_index,0))
+        start+=len(path)
+    # steps(1,end) makes each square disappear only upon arrival.
+    keys=[]
+    for index,opacity in changes:
+        keys.append(f'{pct(index)}%{{opacity:{opacity}}}')
+    keys.append('100%{opacity:0}')
+    parts.append(f'@keyframes food_{x}_{y}{{{"".join(keys)}}}')
+
+# Keyframe every move, with a very short hold at the beginning of each cycle.
+# Note: body may overlap itself on very long runs; avoiding that requires pathfinding.
+for segment in range(max_segments):
+    keys=[]
+    for i,state in enumerate(states):
+        visible=segment<len(state)
+        pos=state[segment] if visible else START
+        keys.append(f'{pct(i)}%{{transform:{translate(pos)};opacity:{1 if visible else 0}}}')
+    parts.append(f'@keyframes seg_{segment}{{{"".join(keys)}}}')
+parts.append('</style>')
+
 for x in range(COLS):
     for y in range(ROWS):
-        count = values.get((x, y), 0)
-
-        if count == 0:
-            color = "#161b22"
-        elif count == 1:
-            color = "#312e81"
-        elif count < 4:
-            color = "#4338ca"
-        elif count < 8:
-            color = "#7c3aed"
-        else:
-            color = "#a855f7"
-
-        style = ""
-
-        if count:
-            style = (
-                f' style="animation:food_{x}_{y} '
-                f'{fmt(duration)}s steps(1,end) infinite"'
-            )
-
-        output.append(
-            f'<rect x="{MARGIN + x * PITCH}" '
-            f'y="{MARGIN + y * PITCH}" '
-            f'width="{CELL}" height="{CELL}" '
-            f'rx="3" fill="{color}"{style}/>'
-        )
-
-# Draw snake body, then head.
-for segment in range(max_segments - 1, -1, -1):
-    color = "#22d3ee" if segment == 0 else "#8b5cf6"
-
-    output.append(
-        f'<rect width="{CELL}" height="{CELL}" '
-        f'rx="4" fill="{color}" '
-        f'style="animation:snake_{segment} '
-        f'{fmt(duration)}s linear infinite"/>'
-    )
-
-output.append("</svg>")
-
-Path("dist").mkdir(exist_ok=True)
-
-Path("dist/custom-snake.svg").write_text(
-    "\n".join(output),
-    encoding="utf-8"
-)
-
-print(f"Generated {len(foods)} contribution squares")
-print(f"Random cycles: {ROUTE_VARIATIONS}")
-print(f"Total frames: {total_frames}")
-print(f"Duration: {duration:.1f}s")
-print("Output: dist/custom-snake.svg")
+        count=values.get((x,y),0)
+        color=('#161b22' if count==0 else '#312e81' if count==1 else '#4338ca' if count<4 else '#7c3aed' if count<8 else '#a855f7')
+        style=(f' style="animation:food_{x}_{y} {fmt(duration)}s steps(1,end) infinite"' if count else '')
+        parts.append(f'<rect x="{MARGIN+x*PITCH}" y="{MARGIN+y*PITCH}" width="{CELL}" height="{CELL}" rx="3" fill="{color}"{style}/>')
+for segment in range(max_segments-1,-1,-1):
+    color='#22d3ee' if segment==0 else '#8b5cf6'
+    parts.append(f'<rect width="{CELL}" height="{CELL}" rx="4" fill="{color}" style="animation:seg_{segment} {fmt(duration)}s linear infinite"/>')
+parts.append('</svg>')
+Path('dist').mkdir(exist_ok=True)
+Path('dist/custom-snake.svg').write_text('\n'.join(parts),encoding='utf-8')
+print(f'Generated {len(foods)} food squares, {N} frames, {duration:.1f}s animation')
