@@ -6,10 +6,10 @@ TOKEN = os.getenv('GITHUB_TOKEN', '')
 if not TOKEN:
     raise RuntimeError('GITHUB_TOKEN is required. Set it in the GitHub Actions workflow.')
 
-CELL, PITCH, MARGIN = 12, 17, 18
+CELL, PITCH, MARGIN = 12, 17, 70
 START_LENGTH = 3
 SECONDS_PER_MOVE = 0.20  # Increase to 0.25 for slower motion
-ROUTE_VARIATIONS = 2
+ROUTE_VARIATIONS = 1
 
 query = '''query($login:String!){user(login:$login){contributionsCollection{contributionCalendar{weeks{contributionDays{date contributionCount}}}}}}'''
 req = urllib.request.Request('https://api.github.com/graphql', data=json.dumps({'query':query,'variables':{'login':USER}}).encode(), headers={'Authorization':f'Bearer {TOKEN}','Content-Type':'application/json','User-Agent':'readme-custom-snake'})
@@ -109,7 +109,7 @@ def make_cycle():
             bodies.append(body.copy())
         if blocked_route:
             continue  # Replan using the updated body and remaining food.
-    for _ in range(6):
+    for _ in range(12):
         positions.append(positions[-1])
         bodies.append(body.copy())
     return positions, eaten, bodies
@@ -157,8 +157,7 @@ for pos in sorted(foods):
     keys.append('100%{opacity:0}')
     parts.append(f'@keyframes food_{x}_{y}{{{"".join(keys)}}}')
 
-# Keyframe every move, with a very short hold at the beginning of each cycle.
-# Note: body may overlap itself on very long runs; avoiding that requires pathfinding.
+# Hold each discrete grid position until the next step; no interpolation through body.
 for segment in range(max_segments):
     keys=[]
     for i,state in enumerate(states):
@@ -176,7 +175,7 @@ for x in range(COLS):
         parts.append(f'<rect x="{MARGIN+x*PITCH}" y="{MARGIN+y*PITCH}" width="{CELL}" height="{CELL}" rx="3" fill="{color}"{style}/>')
 for segment in range(max_segments-1,-1,-1):
     color='#22d3ee' if segment==0 else '#8b5cf6'
-    parts.append(f'<rect width="{CELL}" height="{CELL}" rx="4" fill="{color}" style="animation:seg_{segment} {fmt(duration)}s linear infinite"/>')
+    parts.append(f'<rect width="{CELL}" height="{CELL}" rx="4" fill="{color}" style="animation:seg_{segment} {fmt(duration)}s steps(1,end) infinite"/>')
 parts.append('</svg>')
 Path('dist').mkdir(exist_ok=True)
 Path('dist/custom-snake.svg').write_text('\n'.join(parts),encoding='utf-8')
